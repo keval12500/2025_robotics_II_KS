@@ -91,7 +91,7 @@ class TrackingNode(Node):
         odom_id = self.get_parameter('world_frame_id').get_parameter_value().string_value
         center_points = np.array([msg.pose.position.x, msg.pose.position.y, msg.pose.position.z])
         
-        # TODO: Filtering
+        # TODO: Filtering (labeled as optional?) 
         # You can decide to filter the detected object pose here
         # For example, you can filter the pose based on the distance from the camera
         # or the height of the object
