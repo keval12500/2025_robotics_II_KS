@@ -157,42 +157,67 @@ class TrackingNode(Node):
         return obstacle_pose, goal_pose
     
     def timer_update(self):
-        ################### Write your code here ###################
-        
-        # Now, the robot stops if the object is not detected
-        # But, you may want to think about what to do in this case
-        # and update the command velocity accordingly
-        if self.goal_pose is None:
-            cmd_vel = Twist()
-            cmd_vel.linear.x = 0.0
-            cmd_vel.angular.z = 0.0
-            self.pub_control_cmd.publish(cmd_vel)
-            return
-        
-        # Get the current object pose in the robot base_footprint frame
-        current_obs_pose, current_goal_pose = self.get_current_poses()
-        
-        # TODO: get the control velocity command
-        cmd_vel = self.controller()
-        
-        # publish the control command
+    # Stop if the goal is not detected
+    if self.goal_pose is None:
+        cmd_vel = Twist()
+        cmd_vel.linear.x = 0.0
+        cmd_vel.angular.z = 0.0
         self.pub_control_cmd.publish(cmd_vel)
+        return
+
+    # Get the current object pose in the robot base_footprint frame
+    current_obs_pose, current_goal_pose = self.get_current_poses()
+
+    # Calculate distance to goal
+    goal_distance = np.linalg.norm(current_goal_pose[:2])
+
+    # Stop if within 0.3 meters of the goal
+    if goal_distance < 0.3:
+        cmd_vel = Twist()
+        cmd_vel.linear.x = 0.0
+        cmd_vel.angular.z = 0.0
+        self.pub_control_cmd.publish(cmd_vel)
+        return
+
+    # Get the control velocity command
+    cmd_vel = self.controller(current_obs_pose, current_goal_pose)
+
+    # Publish the control command
+    self.pub_control_cmd.publish(cmd_vel)
+
         #################################################
     
-    def controller(self):
-        # Instructions: You can implement your own control algorithm here
-        # feel free to modify the code structure, add more parameters, more input variables for the function, etc.
-        
-        ########### Write your code here ###########
-        
-        # TODO: Update the control velocity command
-        cmd_vel = Twist()
-        cmd_vel.linear.x = 0
-        cmd_vel.linear.y = 0
-        cmd_vel.angular.z = 0
-        return cmd_vel
-    
-        ############################################
+    def controller(self, current_obs_pose, current_goal_pose):
+    cmd_vel = Twist()
+
+    # Parameters for obstacle avoidance
+    safe_distance = 0.5  # Minimum distance to maintain from the obstacle
+    linear_speed = 0.2   # Base speed
+    angular_speed = 0.5  # Turning speed
+
+    # Vector to goal
+    goal_vector = np.array([current_goal_pose[0], current_goal_pose[1]])
+
+    # Vector to obstacle
+    if current_obs_pose is not None:
+        obs_vector = np.array([current_obs_pose[0], current_obs_pose[1]])
+        obs_distance = np.linalg.norm(obs_vector)
+    else:
+        obs_distance = float('inf')  # No obstacle detected
+
+    # Collision avoidance logic
+    if obs_distance < safe_distance:
+        # If obstacle is too close, steer away
+        angle_to_obstacle = math.atan2(obs_vector[1], obs_vector[0])
+        cmd_vel.linear.x = 0.0
+        cmd_vel.angular.z = angular_speed if angle_to_obstacle < 0 else -angular_speed
+    else:
+        # Navigate toward the goal
+        angle_to_goal = math.atan2(goal_vector[1], goal_vector[0])
+        cmd_vel.linear.x = linear_speed
+        cmd_vel.angular.z = angle_to_goal * 0.5  # Smooth turning adjustment
+
+    return cmd_vel
 
 def main(args=None):
     # Initialize the rclpy library
